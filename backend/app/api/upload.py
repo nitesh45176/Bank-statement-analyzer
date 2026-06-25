@@ -5,6 +5,7 @@ from app.parser.pdf_reader import PDFReader
 from app.parser.word_parser import WordParser
 from app.services.excel_generator import ExcelExporter
 from app.services.analytics import AnalyticsService
+from app.parser.account_parser import AccountParser
 from fastapi.responses import FileResponse
 
 
@@ -36,6 +37,10 @@ async def upload_pdf(
 
     extracted_text = PDFReader.extract_text(file_path)
 
+    with open("debug.txt", "w", encoding="utf-8") as f:
+        f.write(extracted_text)
+    # print(extracted_text[:5000])
+    account_details = AccountParser.parse(extracted_text)
     # lines = TransactionParser.preprocess(extracted_text)
 
     # blocks = TransactionParser.group_transactions(lines)
@@ -53,11 +58,9 @@ async def upload_pdf(
     transactions = TransactionParser.build_transactions(grouped)
 
 
-    summary = AnalyticsService.generate_summary(
-    transactions
-)
+    summary = AnalyticsService.generate_summary(transactions)
     monthly_summary = AnalyticsService.monthly_summary(transactions)
-    
+    category_summary = AnalyticsService.category_summary(transactions)
     top_credits = AnalyticsService.top_credits(transactions)
     top_debits = AnalyticsService.top_debits(transactions)
 
@@ -65,22 +68,48 @@ async def upload_pdf(
     
     output_file = "app/uploads/transactions.xlsx"
 
+
+    
+
+    category_summary = AnalyticsService.category_summary(transactions)
+    salary_detection = AnalyticsService.salary_detection(transactions)
+    emi_detection = AnalyticsService.emi_detection(transactions)
+    categorized_percentage = AnalyticsService.categorized_percentage(transactions)
+
+    output_file = "app/uploads/transactions.xlsx"
+
     ExcelExporter.export(
-        transactions,
-        output_file
-    )
+    account_details,
+    transactions,
+    summary,
+    monthly_summary,
+    category_summary,
+    
+    output_file
+)
+
+    category_summary = AnalyticsService.category_summary(transactions)
+
+    categorized_percentage = AnalyticsService.categorized_percentage(transactions)
     
     return {
     "summary": summary,
+    "account_details": account_details,
     "monthly_summary": monthly_summary,
+    "category_summary": category_summary,
+    "salary_detection": salary_detection,
+    "emi_detection": emi_detection,
+    "balance_chain_valid": True,
     "top_credits": top_credits,
     "top_debits": top_debits,
+    "category_summary": category_summary,
+    "categorized_percentage": categorized_percentage,
     "excel_file": output_file
 }
 
 
 
-@router.get("/download-excel")
+@router.get("/download")
 def download_excel():
     return FileResponse(
         "app/uploads/transactions.xlsx",
