@@ -30,7 +30,7 @@ Built as part of the **Correm Advisory – Full Stack Engineer Hiring Assignment
 * Extract transactions using **PyMuPDF**
 * Handles multi-line transaction descriptions
 * Parses account details
-* Maintains transaction order
+* Maintains Transaction order
 * Zero dropped transactions (for supported statement format)
 
 ---
