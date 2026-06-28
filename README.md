@@ -26,7 +26,7 @@ Built as part of the **Correm Advisory – Full Stack Engineer Hiring Assignment
 
 ### 📄 PDF Processing
 
-* Upload HDFC Bank PDF statements
+* Upload HDFC Bank PDF Statements
 * Extract transactions using **PyMuPDF**
 * Handles multi-line transaction descriptions
 * Parses account details
