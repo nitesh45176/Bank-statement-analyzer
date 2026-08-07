@@ -1,8 +1,10 @@
 import re
 from app.services.categorizer import TransactionCategorizer
 from app.models.transaction import Transaction
+from app.parser.base_parser import BaseParser
+from app.parser.hdfc.account_parser import AccountParser
 
-class TransactionParser:
+class HDFCParser(BaseParser):
 
     DATE_PATTERN = re.compile(r"^\d{2}/\d{2}/\d{2}$")
 
@@ -120,16 +122,6 @@ class TransactionParser:
         return grouped
     
 
-    @staticmethod
-    def parse_amount(value: str) -> float:
-
-        if not value:
-            return 0.0
-
-        return float(
-            value.replace(",", "")
-        )
-    
 
     @classmethod
     def parse_transaction(cls, grouped_rows):
@@ -247,17 +239,34 @@ class TransactionParser:
         return "UNKNOWN"
     
 
+   
+
+
+    def parse_account_details(self, text):
+        return AccountParser.parse(text)
+
+    def parse_transactions(self, grouped_rows):
+         return self.build_transactions(grouped_rows)
+
+    @staticmethod
+    def parse_amount(value: str) -> float:
+
+        if not value:
+            return 0.0
+
+        return float(
+            value.replace(",", "")
+        )
+
     @classmethod
     def build_transactions(cls, grouped_rows):
 
         transactions = []
 
         for transaction_rows in grouped_rows:
+            transaction = cls.parse_transaction(transaction_rows)
 
-            transaction = cls.parse_transaction(
-                transaction_rows
-            )
-
-            transactions.append(transaction)
+            if transaction:
+                transactions.append(transaction)
 
         return transactions

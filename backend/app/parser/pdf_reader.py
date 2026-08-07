@@ -10,16 +10,22 @@ class PDFReader:
         Extracts text from every page of the PDF.
         """
 
-        document = fitz.open(pdf_path)
+        doc = fitz.open(pdf_path)
+
+        if doc.needs_pass:
+            ok = doc.authenticate(password)
+
+            if not ok:
+                raise ValueError("Invalid PDF password")
 
         text = []
 
-        for page in document:
+        for page in doc:
             page_text = page.get_text()
 
             if page_text:
                 text.append(page_text)
 
-        document.close()
+        doc.close()
 
         return "\n".join(text)

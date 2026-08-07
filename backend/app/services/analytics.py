@@ -9,6 +9,20 @@ class AnalyticsService:
 
         total_transactions = len(transactions)
 
+        if total_transactions == 0:
+            return {
+                "total_transactions": 0,
+                "credit_count": 0,
+                "debit_count": 0,
+                "total_credit": 0,
+                "total_debit": 0,
+                "closing_balance": 0,
+                "highest_credit": 0,
+                "highest_debit": 0,
+                "categorized_percent": 0,
+                "uncategorized_percent": 0,
+            }
+
         total_credit = sum(t.credit for t in transactions)
         total_debit = sum(t.debit for t in transactions)
 
@@ -79,10 +93,12 @@ class AnalyticsService:
 
         for t in transactions:
 
-            month = datetime.strptime(
-    t.date,
-    "%d/%m/%y"
-).strftime("%b %Y")
+            try:
+                dt = datetime.strptime(t.date, "%d/%m/%y")
+            except ValueError:
+                dt = datetime.strptime(t.date, "%d-%b-%Y")
+
+            month = dt.strftime("%b %Y")
 
             monthly[month]["credit"] += t.credit
             monthly[month]["debit"] += t.debit
@@ -134,6 +150,11 @@ class AnalyticsService:
     def categorized_percentage(transactions):
 
         total = len(transactions)
+        if total == 0:
+            return {
+                "categorized": 0,
+                "uncategorized": 0,
+            }
 
         categorized = sum(
             1
@@ -142,16 +163,9 @@ class AnalyticsService:
         )
 
         return {
-            "categorized": round(
-                categorized * 100 / total,
-                2
-            ),
-            "uncategorized": round(
-                (total - categorized) * 100 / total,
-                2
-            )
-        }
-    
+        "categorized": round(categorized * 100 / total, 2),
+        "uncategorized": round((total - categorized) * 100 / total, 2),
+    }
 
     @staticmethod
     def category_summary(transactions):

@@ -1,117 +1,152 @@
 from fastapi import APIRouter, UploadFile, File
+from fastapi.responses import FileResponse
 import os
-from app.parser.transaction_parser import TransactionParser
+
 from app.parser.pdf_reader import PDFReader
 from app.parser.word_parser import WordParser
-from app.services.excel_generator import ExcelExporter
+from app.parser.detector import BankDetector
+from app.parser.factory import ParserFactory
+from app.parser.ocr_reader import OCRReader
 from app.services.analytics import AnalyticsService
-from app.parser.account_parser import AccountParser
-from fastapi.responses import FileResponse
-
+from app.services.excel_generator import ExcelExporter
 
 router = APIRouter()
 
 UPLOAD_DIR = "app/uploads"
+OUTPUT_FILE = "app/uploads/transactions.xlsx"
 
-os.makedirs(
-    UPLOAD_DIR,
-    exist_ok=True
-)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 @router.post("/upload")
-async def upload_pdf(
-    file: UploadFile = File(...)
-):
+async def upload_pdf(file: UploadFile = File(...)):
 
-    file_path = os.path.join(
-        UPLOAD_DIR,
-        file.filename
-    )
+    # Save uploaded PDF
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
 
     with open(file_path, "wb") as pdf:
+        pdf.write(await file.read())
 
-        pdf.write(
-            await file.read()
-        )
-
-    extracted_text = PDFReader.extract_text(file_path)
-
-    with open("debug.txt", "w", encoding="utf-8") as f:
-        f.write(extracted_text)
-    # print(extracted_text[:5000])
-    account_details = AccountParser.parse(extracted_text)
-    # lines = TransactionParser.preprocess(extracted_text)
-
-    # blocks = TransactionParser.group_transactions(lines)
+    # Read PDF
+    print("1. PDFReader")
+    extracted_text = PDFReader.extract_text(file_path)  
+    print(extracted_text[:3000])  
 
 
+    print("2. WordParser")
     words = WordParser.extract_words(file_path)
-    rows = WordParser.group_rows(words)
-
-    # transactions = TransactionParser.build_transactions(rows)
+    print("Words:", len(words))
 
 
+    # -----------------------------
+    # Normal PDF
+    # -----------------------------
+    if words:
 
-    grouped = TransactionParser.group_transaction_rows(rows)
+        print("Normal PDF detected.")
 
-    transactions = TransactionParser.build_transactions(grouped)
+        bank = BankDetector.detect(extracted_text)
+        print("Detected Bank:", bank)
+
+        parser = ParserFactory.get_parser(bank)
+
+        account_details = parser.parse_account_details(extracted_text)
+
+        rows = WordParser.group_rows(words)
+        grouped_rows = parser.group_transaction_rows(rows)
+        transactions = parser.parse_transactions(grouped_rows)
+        print("Transactions:", len(transactions))
 
 
+
+    # -----------------------------
+    # Scanned PDF
+    # -----------------------------
+    else:
+
+        print("Scanned PDF detected.")
+        print("Running OCR...")
+
+        extracted_text = OCRReader.extract_text(file_path)
+
+        print(extracted_text[:500])
+
+        bank = BankDetector.detect(extracted_text)
+        print("Detected Bank:", bank)
+
+        parser = ParserFactory.get_parser(bank)
+
+        account_details = parser.parse_account_details(extracted_text)
+
+        # Temporary until OCR transaction parser is built
+        rows = []
+        grouped_rows = []
+        transactions = parser.parse_transactions_from_ocr(extracted_text)
+        print("\nParsed Transactions\n")
+
+        for t in transactions:
+            print(t)
+    
+    
+
+
+    # Analytics
     summary = AnalyticsService.generate_summary(transactions)
     monthly_summary = AnalyticsService.monthly_summary(transactions)
     category_summary = AnalyticsService.category_summary(transactions)
+
+    salary_detection = AnalyticsService.salary_detection(transactions)
+    emi_detection = AnalyticsService.emi_detection(transactions)
+
     top_credits = AnalyticsService.top_credits(transactions)
     top_debits = AnalyticsService.top_debits(transactions)
 
+    categorized_percentage = (
+        AnalyticsService.categorized_percentage(transactions)
+        if transactions
+        else {
+            "categorized": 0,
+            "uncategorized": 0,
+        }
+    )
+
     
-    
-    output_file = "app/uploads/transactions.xlsx"
+    # Export Excel
+    print("Type of monthly_summary:", type(monthly_summary))
+    print("Value of monthly_summary:", monthly_summary)
 
-
-    
-
-    category_summary = AnalyticsService.category_summary(transactions)
-    salary_detection = AnalyticsService.salary_detection(transactions)
-    emi_detection = AnalyticsService.emi_detection(transactions)
-    categorized_percentage = AnalyticsService.categorized_percentage(transactions)
-
-    output_file = "app/uploads/transactions.xlsx"
-
+    print("Type of category_summary:", type(category_summary))
+    print("Type of summary:", type(summary))
     ExcelExporter.export(
-    account_details,
-    transactions,
-    summary,
-    monthly_summary,
-    category_summary,
-    
-    output_file
-)
+        account_details,
+        transactions,
+        summary,
+        monthly_summary,
+        category_summary,
+        OUTPUT_FILE,
+    )
 
-    category_summary = AnalyticsService.category_summary(transactions)
-
-    categorized_percentage = AnalyticsService.categorized_percentage(transactions)
-    
     return {
-    "summary": summary,
-    "account_details": account_details,
-    "monthly_summary": monthly_summary,
-    "category_summary": category_summary,
-    "salary_detection": salary_detection,
-    "emi_detection": emi_detection,
-    "balance_chain_valid": True,
-    "top_credits": top_credits,
-    "top_debits": top_debits,
-    "category_summary": category_summary,
-    "categorized_percentage": categorized_percentage,
-    "excel_file": output_file
-}
-
+        "rows": len(rows),
+        "grouped_rows": len(grouped_rows),
+        "transactions": transactions,
+        "detected_bank": bank,
+        "account_details": account_details,
+        "summary": summary,
+        "monthly_summary": monthly_summary,
+        "category_summary": category_summary,
+        "salary_detection": salary_detection,
+        "emi_detection": emi_detection,
+        "top_credits": top_credits,
+        "top_debits": top_debits,
+        "categorized_percentage": categorized_percentage,
+        "excel_file": OUTPUT_FILE,
+    }
 
 
 @router.get("/download")
 def download_excel():
     return FileResponse(
-        "app/uploads/transactions.xlsx",
-        filename="transactions.xlsx"
+        OUTPUT_FILE,
+        filename="transactions.xlsx",
     )

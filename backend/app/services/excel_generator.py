@@ -47,37 +47,37 @@ class ExcelExporter:
 
         account_sheet.append([
             "Closing Balance",
-            summary["closing_balance"]
+            summary.get("closing_balance", 0)
         ])
 
         account_sheet.append([
             "Credit Count",
-            summary["credit_count"]
+            summary.get("credit_count", 0)
         ])
 
         account_sheet.append([
             "Credit Amount",
-            summary["total_credit"]
+            summary.get("total_credit", 0)
         ])
 
         account_sheet.append([
             "Debit Count",
-            summary["debit_count"]
+            summary.get("debit_count", 0)
         ])
 
         account_sheet.append([
             "Debit Amount",
-            summary["total_debit"]
+            summary.get("total_debit", 0)
         ])
 
         account_sheet.append([
             "Categorized %",
-            summary["categorized_percent"]
+            summary.get("categorized_percent", 0)
         ])
 
         account_sheet.append([
             "Uncategorized %",
-            summary["uncategorized_percent"]
+            summary.get("uncategorized_percent", 0)
         ])
         account_sheet.append(["Total Credit", summary["total_credit"]])
         account_sheet.append(["Total Debit", summary["total_debit"]])
