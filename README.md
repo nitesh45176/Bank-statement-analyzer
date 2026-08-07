@@ -28,7 +28,7 @@ Built as part of the **Correm Advisory – Full Stack Engineer Hiring Assignment
 
 * Upload HDFC Bank PDF Statements
 * Extract transactions using **PyMuPDF**
-* Handles multi-line transaction descriptions
+* Handles multi-line transaction description
 * Parses account details
 * Maintains Transaction order
 * Zero dropped transactions (for supported statement format)
