@@ -1,10 +1,10 @@
-
 [project]
 name = "backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
+
 dependencies = [
     "easyocr>=1.7.2",
     "fastapi>=0.138.0",
@@ -17,4 +17,5 @@ dependencies = [
     "pymupdf>=1.27.2.3",
     "python-multipart>=0.0.32",
     "uvicorn>=0.49.0",
+    "rapidocr-onnxruntime==1.4.4",
 ]
