@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 import os
 
@@ -9,17 +9,21 @@ from app.parser.factory import ParserFactory
 from app.parser.ocr_reader import OCRReader
 from app.services.analytics import AnalyticsService
 from app.services.excel_generator import ExcelExporter
+import uuid
+
+from app.services.statement_store import StatementStore
+from app.rag.ingest import ingest_transactions
 
 router = APIRouter()
 
-UPLOAD_DIR = "app/uploads"
-OUTPUT_FILE = "app/uploads/transactions.xlsx"
+UPLOAD_DIR = os.path.join(os.getcwd(), "data", "uploads")
+OUTPUT_FILE = os.path.join(UPLOAD_DIR, "transactions.xlsx")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 @router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
 
     # Save uploaded PDF
     file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -110,6 +114,29 @@ async def upload_pdf(file: UploadFile = File(...)):
         }
     )
 
+
+    # -----------------------------
+    # AI Statement Store + RAG
+    # -----------------------------
+    statement_id = str(uuid.uuid4())
+
+    StatementStore.save(
+        statement_id,
+        {
+            "transactions": transactions,
+            "account_details": account_details,
+        },
+    )
+
+    # Background RAG ingestion so the upload response returns immediately
+    background_tasks.add_task(
+        ingest_transactions,
+        statement_id,
+        transactions,
+    )
+
+    print("Statement ID:", statement_id)
+
     
     # Export Excel
     print("Type of monthly_summary:", type(monthly_summary))
@@ -127,6 +154,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     )
 
     return {
+        "statement_id": statement_id,
         "rows": len(rows),
         "grouped_rows": len(grouped_rows),
         "transactions": transactions,
@@ -146,6 +174,11 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @router.get("/download")
 def download_excel():
+    if not os.path.exists(OUTPUT_FILE):
+        raise HTTPException(
+            status_code=404,
+            detail="Transactions excel file not found. Please upload a statement first."
+        )
     return FileResponse(
         OUTPUT_FILE,
         filename="transactions.xlsx",
